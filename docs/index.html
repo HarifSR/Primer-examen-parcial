@@ -3,8 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>El Progreso – Indicadores Censo | Ricardo Samayoa–1890-22-3562</title>
+  <title>El Progreso – Indicadores Censo | Ricardo–1890-22-3562</title>
 
+ 
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
@@ -40,8 +41,9 @@
       <div class="col-12 col-md-6">
         <label for="selMunicipio" class="form-label">Área</label>
         <select id="selMunicipio" class="form-select">
+          
         </select>
-        <div class="form-text">Consultas: Departamento (999) o cualquier municipio (201–208).</div>
+        <div class="form-text">La consulta es dinámica: Departamento (999) o cualquier municipio (201–208).</div>
       </div>
       <div class="col-12 col-md-3">
         <button id="btnRecargar" class="btn btn-primary w-100">
@@ -53,7 +55,8 @@
       </div>
     </div>
 
-<section class="mt-4">
+   
+    <section class="mt-4">
       <div class="row g-3" id="kpis">
         <div class="col-6 col-lg-3">
           <div class="card h-100">
@@ -97,7 +100,8 @@
       </div>
     </section>
 
-<section class="mt-4">
+  
+    <section class="mt-4">
       <div class="row g-3">
         <div class="col-12 col-lg-6">
           <div class="card h-100">
@@ -124,11 +128,45 @@
       </div>
     </section>
 
+    <!-- Población por pueblos -->
 <section class="mt-4">
+  <div class="card">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h6 class="mb-0">Población por pueblos</h6>
+        <span class="badge rounded-pill badge-soft">API</span>
+      </div>
+      <div class="row g-3">
+        <div class="col-12 col-lg-6">
+          <div class="table-responsive">
+            <table class="table table-sm align-middle">
+              <thead>
+                <tr><th>Pueblo</th><th class="text-end">Personas</th><th class="text-end">%</th></tr>
+              </thead>
+              <tbody id="tbodyPueblos"></tbody>
+              <tfoot>
+                <tr>
+                  <th>Total</th>
+                  <th class="text-end" id="pueblosTotal">—</th>
+                  <th class="text-end" id="pueblosPctTotal">100%</th>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+        <div class="col-12 col-lg-6">
+          <canvas id="chartPueblos" height="160"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+    
+    <section class="mt-4">
       <div class="card">
         <div class="card-body">
           <div class="d-flex justify-content-between align-items-center mb-2">
-            <h6 class="mb-0">Indicadores</h6>
+            <h6 class="mb-0">Indicadores expuestos por la API</h6>
             <span class="badge rounded-pill badge-soft" id="badgeTotalInd">0 indicadores</span>
           </div>
           <div class="table-responsive">
@@ -137,183 +175,220 @@
               <tbody id="tbodyInd"></tbody>
             </table>
           </div>
-          <div class="small text-secondary">Se listan todas las claves entregadas, con etiquetas.</div>
+          <div class="small text-secondary">Se listan todas las claves entregadas por la API, con etiquetas legibles.</div>
         </div>
       </div>
     </section>
 
-<section class="mt-4 text-end footer">
-      <span id="fuente">Fuente: Censo (El Progreso) efectuado por la municipalidad – <code>:D</code></span>
+    <section class="mt-4 text-end footer">
+      <span id="fuente">Fuente: API Censo (El Progreso) – <code>/API/indicadores/2/{código}</code></span>
     </section>
   </main>
 
-  <script>
+<script>
+
+  const AREAS = [
+    { code: 999, name: "Departamento El Progreso" },
+    { code: 201, name: "Guastatoya" },
+    { code: 202, name: "Morazán" },
+    { code: 203, name: "San Agustín Acasaguastlán" },
+    { code: 204, name: "San Cristóbal Acasaguastlán" },
+    { code: 205, name: "El Jícaro" },
+    { code: 206, name: "Sansare" },
+    { code: 207, name: "Sanarate" },
+    { code: 208, name: "San Antonio La Paz" }
+  ];
+
+  
+  const sel = document.getElementById('selMunicipio');
+  const estado = document.getElementById('estado');
+  const btnRecargar = document.getElementById('btnRecargar');
+
+  
+  const kTotal = document.getElementById('kTotal');
+  const kHombres = document.getElementById('kHombres');
+  const kMujeres = document.getElementById('kMujeres');
+  const kHombresPct = document.getElementById('kHombresPct');
+  const kMujeresPct = document.getElementById('kMujeresPct');
+  const pHombres = document.getElementById('pHombres');
+  const pMujeres = document.getElementById('pMujeres');
+  const kUrbRur = document.getElementById('kUrbRur');
+  const kUrbanoPct = document.getElementById('kUrbanoPct');
+  const pUrbano = document.getElementById('pUrbano');
+
+  
+  const tbodyInd = document.getElementById('tbodyInd');
+  const badgeTotalInd = document.getElementById('badgeTotalInd');
+
+  
+  const tbodyPueblos = document.getElementById('tbodyPueblos');
+  const pueblosTotal = document.getElementById('pueblosTotal');
+  const pueblosPctTotal = document.getElementById('pueblosPctTotal');
+
+  
+  let chartSexo, chartEdad, chartPueblos;
+
+  
+  const fmt = (n) => n===null||n===undefined||isNaN(n) ? '—' : Number(n).toLocaleString('es-GT');
+  const labelize = (k) => k
+      .replaceAll('_',' ')
+      .replace(/^pob edad/,'Población edad')
+      .replace(/^total sexo/,'Total sexo')
+      .replace(/\b(\d{2,})\b/g,'$1')
+      .replace(/\b([a-z])/g, c=>c.toUpperCase());
+
+  function setEstado(text, ok=true){
+    estado.textContent = text;
+    estado.className = 'badge rounded-pill ' + (ok ? 'badge-soft' : 'bg-danger');
+  }
+
+  function fillSelect(){
+    sel.innerHTML = AREAS.map(a=>`<option value="${a.code}">${a.code} — ${a.name}</option>`).join('');
+    sel.value = '999';
+  }
+
+  
+  const PUEBLOS = [
+    { key:'Maya',          rx:/maya/i },
+    { key:'Garífuna',      rx:/gar[ií]funa/i },
+    { key:'Xinka',         rx:/xinka/i },
+    { key:'Afrodescendiente/Creole/Afromestizo', rx:/afro|creole|afromest/i },
+    { key:'Ladino',        rx:/ladin/i },
+    { key:'Extranjero',    rx:/extra(njero)?/i },
+  ];
+
+  
+  function extractPueblos(data){
+    const entries = Object.entries(data);
+    const out = PUEBLOS.map(p=>{
+      const hit = entries.find(([k]) => p.rx.test(k));
+      const val = hit ? Number(hit[1]) || 0 : 0;
+      return { name:p.key, value:val };
+    });
     
-    const AREAS = [
-      { code: 999, name: "Departamento El Progreso" },
-      { code: 201, name: "Guastatoya" },
-      { code: 202, name: "Morazán" },
-      { code: 203, name: "San Agustín Acasaguastlán" },
-      { code: 204, name: "San Cristóbal Acasaguastlán" },
-      { code: 205, name: "El Jícaro" },
-      { code: 206, name: "Sansare" },
-      { code: 207, name: "Sanarate" },
-      { code: 208, name: "San Antonio La Paz" }
-    ];
-
- const sel = document.getElementById('selMunicipio');
-    const estado = document.getElementById('estado');
-    const btnRecargar = document.getElementById('btnRecargar');
-
-    const kTotal = document.getElementById('kTotal');
-    const kHombres = document.getElementById('kHombres');
-    const kMujeres = document.getElementById('kMujeres');
-    const kHombresPct = document.getElementById('kHombresPct');
-    const kMujeresPct = document.getElementById('kMujeresPct');
-    const pHombres = document.getElementById('pHombres');
-    const pMujeres = document.getElementById('pMujeres');
-    const kUrbRur = document.getElementById('kUrbRur');
-    const kUrbanoPct = document.getElementById('kUrbanoPct');
-    const pUrbano = document.getElementById('pUrbano');
-
-    const tbodyInd = document.getElementById('tbodyInd');
-    const badgeTotalInd = document.getElementById('badgeTotalInd');
-
-    
-    let chartSexo, chartEdad;
-
- const fmt = (n) => n===null||n===undefined||isNaN(n) ? '—' : Number(n).toLocaleString('es-GT');
-    const labelize = (k) => k
-        .replaceAll('_',' ')
-        .replace(/^pob edad/,'Población edad')
-        .replace(/^total sexo/,'Total sexo')
-        .replace(/\b(\d{2,})\b/g,'$1')
-        .replace(/\b([a-z])/g, c=>c.toUpperCase());
-
-    function setEstado(text, ok=true){
-      estado.textContent = text;
-      estado.className = 'badge rounded-pill ' + (ok ? 'badge-soft' : 'bg-danger');
-    }
-
-    function fillSelect(){
-      sel.innerHTML = AREAS.map(a=>`<option value="${a.code}">${a.code} — ${a.name}</option>`).join('');
-      sel.value = '999';
-    }
-
-    async function cargar(){
-      const code = sel.value;
-      setEstado('Cargando…', true);
-      try{
-        const url = `https://censopoblacion.azurewebsites.net/API/indicadores/2/${code}`;
-        const res = await fetch(url, {cache:'no-store'});
-        if(!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        render(data);
-        setEstado(`OK (${code})`);
-      }catch(err){
-        console.error(err);
-        setEstado('Error al cargar', false);
+    for(const [k,v] of entries){
+      if(/pueblo|etnia|poblacion_por_pueblos/i.test(k) && typeof v === 'number'){
+        const name = labelize(k);
+        const exists = out.some(o => o.name.toLowerCase() === name.toLowerCase());
+        if(!exists) out.push({ name, value: Number(v)||0 });
       }
     }
+    return out.filter(x => x.value > 0);
+  }
 
-    function render(data){
-      
-  const total   = Number(data.pob_total) || 0;
-  const hombres = Number(data.total_sexo_hombre) || 0;
-  const mujeres = Number(data.total_sexo_mujeres) || 0;
+  async function cargar(){
+    const code = sel.value;
+    setEstado('Cargando…', true);
+    try{
+      const url = `https://censopoblacion.azurewebsites.net/API/indicadores${code}`;
+      const res = await fetch(url, {cache:'no-store'});
+      if(!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      render(data);
+      setEstado(`OK (${code})`);
+    }catch(err){
+      console.error(err);
+      setEstado('Error al cargar', false);
+    }
+  }
 
-  kTotal.textContent   = fmt(total);
-  kHombres.textContent = fmt(hombres);
-  kMujeres.textContent = fmt(mujeres);
+  function render(data){
+    
+    const hombres = data.total_sexo_hombre ?? data.total_hombres ?? data.hombres ?? 0;
+    const mujeres = data.total_sexo_mujeres ?? data.total_mujeres ?? data.mujeres ?? 0;
+    const total = (Number(hombres)||0) + (Number(mujeres)||0);
 
-  const ph = Number(data.porc_sexo_hombre) || (total? (hombres/total*100):0);
-  const pm = Number(data.porc_sexo_mujeres) || (total? (mujeres/total*100):0);
-  pHombres.style.width = ph.toFixed(1)+'%';
-  pMujeres.style.width = pm.toFixed(1)+'%';
-  kHombresPct.textContent = `${ph.toFixed(1)}% del total`;
-  kMujeresPct.textContent = `${pm.toFixed(1)}% del total`;
+    kTotal.textContent   = fmt(total);
+    kHombres.textContent = fmt(hombres);
+    kMujeres.textContent = fmt(mujeres);
 
- const urbano = Number(data.total_sector_urbano) || 0;
-  const rural  = Number(data.total_sector_rural) || 0;
-  const purb   = Number(data.porc_sector_urbano) || (urbano+ rural ? (urbano/(urbano+rural))*100 : 0);
-  pUrbano.style.width = purb.toFixed(1)+'%';
-  kUrbanoPct.textContent = `${purb.toFixed(1)}% urbana`;
-  kUrbRur.textContent = `${fmt(urbano)} urbana / ${fmt(rural)} rural`;
+    const ph = total ? (hombres/total*100) : 0;
+    const pm = total ? (mujeres/total*100) : 0;
+    pHombres.style.width = ph.toFixed(1)+'%';
+    pMujeres.style.width = pm.toFixed(1)+'%';
+    kHombresPct.textContent = `${ph.toFixed(1)}% del total`;
+    kMujeresPct.textContent = `${pm.toFixed(1)}% del total`;
 
-  const e014   = Number(data.pob_edad_014)  || 0;
-  const e1564  = Number(data.pob_edad_1564) || 0;
-  const e65mas = Number(data.pob_edad_65)   || 0;
+    const urbano = data.urbana ?? data.poblacion_urbana ?? data.total_urbana ?? null;
+    const rural  = data.rural  ?? data.poblacion_rural  ?? data.total_rural  ?? null;
+    if(urbano!=null && rural!=null){
+      const purb = (Number(urbano)/(Number(urbano)+Number(rural)))*100;
+      pUrbano.style.width = purb.toFixed(1)+'%';
+      kUrbanoPct.textContent = `${purb.toFixed(1)}% urbana`;
+      kUrbRur.textContent = `${fmt(urbano)} urbana / ${fmt(rural)} rural`;
+    }else{
+      pUrbano.style.width = '0%';
+      kUrbanoPct.textContent = '—';
+      kUrbRur.textContent = '—';
+    }
 
-  if(chartSexo) chartSexo.destroy();
-  chartSexo = new Chart(document.getElementById('chartSexo'), {
-    type:'bar',
-    data:{ labels:['Hombres','Mujeres'], datasets:[{ data:[hombres, mujeres] }] },
-    options:{ plugins:{ legend:{display:false}}, scales:{ y:{ beginAtZero:true } } }
-  });
+    
+    const e014   = data.pob_edad_014   ?? data.edad_0_14   ?? null;
+    const e1564  = data.pob_edad_1564  ?? data.edad_15_64  ?? null;
+    const e65mas = data.pob_edad_65    ?? data.edad_65_mas ?? null;
 
-  if(chartEdad) chartEdad.destroy();
-  chartEdad = new Chart(document.getElementById('chartEdad'), {
-    type:'bar',
-    data:{ labels:['0–14','15–64','65+'], datasets:[{ data:[e014, e1564, e65mas] }] },
-    options:{ plugins:{ legend:{display:false}}, scales:{ y:{ beginAtZero:true } } }
-  });
+    
+    const ctx1 = document.getElementById('chartSexo');
+    if(chartSexo) chartSexo.destroy();
+    chartSexo = new Chart(ctx1, {
+      type:'bar',
+      data:{ labels:['Hombres','Mujeres'], datasets:[{ data:[hombres,mujeres] }] },
+      options:{ plugins:{ legend:{display:false} }, scales:{ y:{ beginAtZero:true } } }
+    });
 
-  const LABELS = {
-    id:'ID',
-    depto_id:'Departamento ID',
-    municipio_id:'Municipio ID',
-    nombre:'Nombre',
-    tipo_lugar:'Tipo de lugar',
-    total_lugares:'Total de lugares',
-    capital:'Capital',
-    ext_territorial:'Extensión territorial (km²)',
-    pob_total:'Población total',
-    indice_masculinidad:'Índice de masculinidad',
-    prom_hijos_mujer:'Promedio de hijos por mujer',
-    edad_promedio:'Edad promedio',
-    indice_dependencia:'Índice de dependencia',
-    anios_prom_estudio:'Años promedio de estudio',
-    alfabetismo:'Alfabetismo (%)',
-    viviendas_part:'Viviendas particulares',
-    total_hogares:'Total de hogares',
-    prom_personas_hogar:'Prom. personas por hogar',
-    total_jefas_hogar:'% jefas de hogar',
-    total_sexo_hombre:'Total: hombres',
-    porc_sexo_hombre:'% hombres',
-    total_sexo_mujeres:'Total: mujeres',
-    porc_sexo_mujeres:'% mujeres',
-    total_sector_urbano:'Total urbano',
-    porc_sector_urbano:'% urbano',
-    total_sector_rural:'Total rural',
-    porc_sector_rural:'% rural',
-    pob_edad_014:'Población 0–14',
-    porc_edad_014:'% 0–14',
-    pob_edad_1564:'Población 15–64',
-    porc_edad_1564:'% 15–64',
-    pob_edad_65:'Población 65+',
-    porc_edad_65:'% 65+',
-    pob_pueblo_maya:'Pueblo Maya',
-    porc_pueblo_maya:'% Pueblo Maya',
-    pob_pueblo_garifuna:'Pueblo Garífuna',
-    porc_pueblo_garifuna:'% Pueblo Garífuna',
-    pob_pueblo_xinca:'Pueblo Xinca',
-    porc_pueblo_xinca:'% Pueblo Xinca',
-    pob_pueblo_afrodescendiente:'Pueblo Afrodescendiente',
-    porc_pueblo_afrodescendiente:'% Pueblo Afrodescendiente',
-    pob_pueblo_ladino:'Pueblo Ladino',
-    porc_pueblo_ladino:'% Pueblo Ladino',
-    pob_pueblo_extranjero:'Población extranjera',
-    porc_pueblo_extranjero:'% extranjera'
-  };
+    
+    const ctx2 = document.getElementById('chartEdad');
+    if(chartEdad) chartEdad.destroy();
+    chartEdad = new Chart(ctx2, {
+      type:'bar',
+      data:{ labels:['0–14','15–64','65+'], datasets:[{ data:[e014||0, e1564||0, e65mas||0] }] },
+      options:{ plugins:{ legend:{display:false} }, scales:{ y:{ beginAtZero:true } } }
+    });
 
-  const entries = Object.entries(data).sort(([a],[b]) => a.localeCompare(b));
-  tbodyInd.innerHTML = entries.map(([k,v])=>{
-    const nice = LABELS[k] || k.replaceAll('_',' ').replace(/\b([a-z])/g,c=>c.toUpperCase());
-    const val  = typeof v === 'number' ? fmt(v) : (v ?? '—');
-    return `<tr><td class="key">${nice}</td><td class="text-end value">${val}</td></tr>`;
-  }).join('');
-  badgeTotalInd.textContent = `${entries.length} indicadores`;
-}
+    
+    const pueblos = extractPueblos(data).sort((a,b)=> b.value - a.value);
+    const totalPueblos = pueblos.reduce((s,p)=>s+p.value, 0);
+
+    tbodyPueblos.innerHTML = pueblos.map(p=>{
+      const pct = totalPueblos ? (p.value/totalPueblos*100) : 0;
+      return `<tr>
+        <td>${p.name}</td>
+        <td class="text-end value">${fmt(p.value)}</td>
+        <td class="text-end">${pct.toFixed(2)}%</td>
+      </tr>`;
+    }).join('');
+
+    pueblosTotal.textContent = fmt(totalPueblos);
+    pueblosPctTotal.textContent = totalPueblos ? '100%' : '—';
+
+    const ctxP = document.getElementById('chartPueblos');
+    if(chartPueblos) chartPueblos.destroy();
+    chartPueblos = new Chart(ctxP, {
+      type:'pie',
+      data:{
+        labels: pueblos.map(p=>p.name),
+        datasets:[{ data: pueblos.map(p=>p.value) }]
+      },
+      options:{ plugins:{ legend:{ position:'bottom' } } }
+    });
+
+    
+    const entries = Object.entries(data);
+    entries.sort(([a],[b]) => a.localeCompare(b));
+    tbodyInd.innerHTML = entries.map(([k,v])=>{
+      const nice = labelize(k);
+      const val  = (typeof v === 'number') ? fmt(v) : (v ?? '—');
+      return `<tr><td class="key">${nice}</td><td class="text-end value">${val}</td></tr>`;
+    }).join('');
+    badgeTotalInd.textContent = `${entries.length} indicadores`;
+  }
+
+  
+  fillSelect();
+  cargar();
+  sel.addEventListener('change', cargar);
+  btnRecargar.addEventListener('click', cargar);
 </script>
+
 </body>
 </html>
