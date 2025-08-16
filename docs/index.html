@@ -186,209 +186,275 @@
   </main>
 
 <script>
+const API_URL_BASE = 'https://censopoblacion.azurewebsites.net/API/indicadores/2/';
 
-  const AREAS = [
-    { code: 999, name: "Departamento El Progreso" },
-    { code: 201, name: "Guastatoya" },
-    { code: 202, name: "Morazán" },
-    { code: 203, name: "San Agustín Acasaguastlán" },
-    { code: 204, name: "San Cristóbal Acasaguastlán" },
-    { code: 205, name: "El Jícaro" },
-    { code: 206, name: "Sansare" },
-    { code: 207, name: "Sanarate" },
-    { code: 208, name: "San Antonio La Paz" }
+const municipios = [
+  { codigo: '999', nombre: 'El Progreso (Departamental)' },
+  { codigo: '201', nombre: 'Guastatoya' },
+  { codigo: '202', nombre: 'Morazán' },
+  { codigo: '203', nombre: 'San Agustín Acasaguastlán' },
+  { codigo: '204', nombre: 'San Cristóbal Acasaguastlán' },
+  { codigo: '205', nombre: 'El Jícaro' },
+  { codigo: '206', nombre: 'Sansare' },
+  { codigo: '207', nombre: 'Sanarate' },
+  { codigo: '208', nombre: 'San Antonio la Paz' }
+];
+
+
+const municipioSelector = document.getElementById('municipioSelector');
+const datosCensoDiv = document.getElementById('datosCenso');
+
+
+const fmt = (n) => n===null||n===undefined||n===''||isNaN(n) ? '—' : Number(n).toLocaleString('es-GT');
+
+
+function extractPueblos(data){
+  const entries = Object.entries(data || {});
+  const pick = (rx) => {
+    const hit = entries.find(([k]) => rx.test(k));
+    return hit ? Number(hit[1]) || 0 : 0;
+  };
+
+  const pueblos = [
+    { name:'Maya',   value: pick(/pueblo.*maya|maya/i) },
+    { name:'Garífuna', value: pick(/pueblo.*gar[ií]funa|gar[ií]funa/i) },
+    { name:'Xinka',  value: pick(/pueblo.*xinka|xinka/i) },
+    { name:'Afrodescendiente/Creole/Afromestizo', value: pick(/pueblo.*afro|creole|afromest/i) },
+    { name:'Ladino', value: pick(/pueblo.*ladin|ladin/i) },
+    { name:'Extranjero', value: pick(/pueblo.*extra(njero)?|extranj/i) }
   ];
 
-  
-  const sel = document.getElementById('selMunicipio');
-  const estado = document.getElementById('estado');
-  const btnRecargar = document.getElementById('btnRecargar');
+ 
+  return pueblos.filter(p => p.value > 0);
+}
 
-  
-  const kTotal = document.getElementById('kTotal');
-  const kHombres = document.getElementById('kHombres');
-  const kMujeres = document.getElementById('kMujeres');
-  const kHombresPct = document.getElementById('kHombresPct');
-  const kMujeresPct = document.getElementById('kMujeresPct');
-  const pHombres = document.getElementById('pHombres');
-  const pMujeres = document.getElementById('pMujeres');
-  const kUrbRur = document.getElementById('kUrbRur');
-  const kUrbanoPct = document.getElementById('kUrbanoPct');
-  const pUrbano = document.getElementById('pUrbano');
+function cargarMunicipios() {
+  municipios.forEach(municipio => {
+    const option = document.createElement('option');
+    option.value = municipio.codigo;
+    option.textContent = municipio.nombre;
+    municipioSelector.appendChild(option);
+  });
+}
 
-  
-  const tbodyInd = document.getElementById('tbodyInd');
-  const badgeTotalInd = document.getElementById('badgeTotalInd');
 
-  
-  const tbodyPueblos = document.getElementById('tbodyPueblos');
-  const pueblosTotal = document.getElementById('pueblosTotal');
-  const pueblosPctTotal = document.getElementById('pueblosPctTotal');
+async function obtenerDatosCenso(codigoMunicipio) {
+  const url = `${API_URL_BASE}${codigoMunicipio}`;
+  datosCensoDiv.innerHTML = `
+    <div class="col-12 text-center p-5">
+      <p>Cargando datos...</p>
+      <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Cargando...</span>
+      </div>
+    </div>`;
 
-  
-  let chartSexo, chartEdad, chartPueblos;
+  try {
+    const response = await fetch(url, { cache: 'no-store' });
+    if (!response.ok) throw new Error('No se pudo obtener la información de la API');
 
-  
-  const fmt = (n) => n===null||n===undefined||isNaN(n) ? '—' : Number(n).toLocaleString('es-GT');
-  const labelize = (k) => k
-      .replaceAll('_',' ')
-      .replace(/^pob edad/,'Población edad')
-      .replace(/^total sexo/,'Total sexo')
-      .replace(/\b(\d{2,})\b/g,'$1')
-      .replace(/\b([a-z])/g, c=>c.toUpperCase());
-
-  function setEstado(text, ok=true){
-    estado.textContent = text;
-    estado.className = 'badge rounded-pill ' + (ok ? 'badge-soft' : 'bg-danger');
-  }
-
-  function fillSelect(){
-    sel.innerHTML = AREAS.map(a=>`<option value="${a.code}">${a.code} — ${a.name}</option>`).join('');
-    sel.value = '999';
-  }
-
-  
-  const PUEBLOS = [
-    { key:'Maya',          rx:/maya/i },
-    { key:'Garífuna',      rx:/gar[ií]funa/i },
-    { key:'Xinka',         rx:/xinka/i },
-    { key:'Afrodescendiente/Creole/Afromestizo', rx:/afro|creole|afromest/i },
-    { key:'Ladino',        rx:/ladin/i },
-    { key:'Extranjero',    rx:/extra(njero)?/i },
-  ];
-
-  
-  function extractPueblos(data){
-    const entries = Object.entries(data);
-    const out = PUEBLOS.map(p=>{
-      const hit = entries.find(([k]) => p.rx.test(k));
-      const val = hit ? Number(hit[1]) || 0 : 0;
-      return { name:p.key, value:val };
-    });
     
-    for(const [k,v] of entries){
-      if(/pueblo|etnia|poblacion_por_pueblos/i.test(k) && typeof v === 'number'){
-        const name = labelize(k);
-        const exists = out.some(o => o.name.toLowerCase() === name.toLowerCase());
-        if(!exists) out.push({ name, value: Number(v)||0 });
+    let dataText = await response.text();
+    dataText = dataText.substring(1, dataText.length - 1).replace(/\\"/g, '"');
+
+    let data = JSON.parse(dataText);
+    if (Array.isArray(data)) data = data[0];
+
+    mostrarDatos(data);
+    history.pushState(null, '', `?municipio=${codigoMunicipio}`);
+
+  } catch (error) {
+    console.error("Error al obtener datos:", error);
+    datosCensoDiv.innerHTML = `
+      <div class="col-12">
+        <div class="alert alert-danger" role="alert">
+          Ocurrió un error al cargar los datos. Intenta de nuevo.
+        </div>
+      </div>`;
+  }
+}
+
+function mostrarDatos(data) {
+  datosCensoDiv.innerHTML = ''; 
+  if (!data) {
+    datosCensoDiv.innerHTML = `<div class="col-12"><p class="text-center text-muted">No se encontraron datos para este municipio.</p></div>`;
+    return;
+  }
+
+  const ubicacion = data["nombre"];
+
+  const gruposDeDatos = {
+    "Población": {
+      "Población total": data["pob_total"],
+      "Población masculina": data["total_sexo_hombre"],
+      "Población femenina": data["total_sexo_mujeres"],
+      "Porcentaje de hombres": data["porc_sexo_hombre"],
+      "Porcentaje de mujeres": data["porc_sexo_mujeres"]
+    },
+    "Demografía y Edad": {
+      "Edad promedio": data["edad_promedio"],
+      "Índice de dependencia": data["indice_dependencia"],
+      "Población < 15 años": data["pob_edad_014"],
+      "Población 15-64 años": data["pob_edad_1564"],
+      "Población > 65 años": data["pob_edad_65"]
+    },
+    "Educación y Empleo": {
+      "Años promedio de estudio": data["anios_prom_estudio"],
+      "Alfabetismo (%)": data["alfabetismo"],
+    },
+    "Vivienda": {
+      "Total de viviendas particulares": data["viviendas_part"],
+      "Total de hogares": data["total_hogares"],
+      "Promedio de personas por hogar": data["prom_personas_hogar"],
+      "Hogares con jefatura femenina": data["total_jefas_hogar"]
+    }
+  };
+
+  
+  let htmlContent = `
+    <div class="col-12 mb-4">
+      <h3 class="text-primary">${ubicacion || '—'}</h3>
+    </div>
+  `;
+
+  
+  for (const grupo in gruposDeDatos) {
+    const items = gruposDeDatos[grupo];
+    if (Object.keys(items).length > 0) {
+      htmlContent += `<div class="col-12 mt-3"><h4>${grupo}</h4><hr></div>`;
+      for (const [key, value] of Object.entries(items)) {
+        htmlContent += `
+          <div class="col-md-6 col-lg-4 mb-3">
+            <div class="card h-100 shadow-sm">
+              <div class="card-body">
+                <h6 class="card-title text-secondary">${key}</h6>
+                <p class="card-text fs-4 fw-bold text-primary">${fmt(value)}</p>
+              </div>
+            </div>
+          </div>
+        `;
       }
     }
-    return out.filter(x => x.value > 0);
   }
 
-  async function cargar(){
-    const code = sel.value;
-    setEstado('Cargando…', true);
-    try{
-      const url = `https://censopoblacion.azurewebsites.net/API/indicadores${code}`;
-      const res = await fetch(url, {cache:'no-store'});
-      if(!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      render(data);
-      setEstado(`OK (${code})`);
-    }catch(err){
-      console.error(err);
-      setEstado('Error al cargar', false);
-    }
-  }
 
-  function render(data){
-    
-    const hombres = data.total_sexo_hombre ?? data.total_hombres ?? data.hombres ?? 0;
-    const mujeres = data.total_sexo_mujeres ?? data.total_mujeres ?? data.mujeres ?? 0;
-    const total = (Number(hombres)||0) + (Number(mujeres)||0);
+  const pueblos = extractPueblos(data);
+  const totalPueblos = pueblos.reduce((s,p)=>s+p.value, 0);
 
-    kTotal.textContent   = fmt(total);
-    kHombres.textContent = fmt(hombres);
-    kMujeres.textContent = fmt(mujeres);
+  htmlContent += `
+    <div class="col-12 mt-4">
+      <h4>Población por pueblos</h4><hr>
+    </div>
 
-    const ph = total ? (hombres/total*100) : 0;
-    const pm = total ? (mujeres/total*100) : 0;
-    pHombres.style.width = ph.toFixed(1)+'%';
-    pMujeres.style.width = pm.toFixed(1)+'%';
-    kHombresPct.textContent = `${ph.toFixed(1)}% del total`;
-    kMujeresPct.textContent = `${pm.toFixed(1)}% del total`;
+    <div class="col-12 col-lg-6">
+      <div class="table-responsive">
+        <table class="table table-sm align-middle">
+          <thead>
+            <tr>
+              <th>Pueblo</th>
+              <th class="text-end">Personas</th>
+              <th class="text-end">%</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyPueblos">
+            ${pueblos.map(p=>{
+              const pct = totalPueblos ? (p.value/totalPueblos*100) : 0;
+              return `<tr>
+                <td>${p.name}</td>
+                <td class="text-end">${fmt(p.value)}</td>
+                <td class="text-end">${pct.toFixed(2)}%</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+          <tfoot>
+            <tr>
+              <th>Total</th>
+              <th class="text-end">${fmt(totalPueblos)}</th>
+              <th class="text-end">${totalPueblos ? '100%' : '—'}</th>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
 
-    const urbano = data.urbana ?? data.poblacion_urbana ?? data.total_urbana ?? null;
-    const rural  = data.rural  ?? data.poblacion_rural  ?? data.total_rural  ?? null;
-    if(urbano!=null && rural!=null){
-      const purb = (Number(urbano)/(Number(urbano)+Number(rural)))*100;
-      pUrbano.style.width = purb.toFixed(1)+'%';
-      kUrbanoPct.textContent = `${purb.toFixed(1)}% urbana`;
-      kUrbRur.textContent = `${fmt(urbano)} urbana / ${fmt(rural)} rural`;
-    }else{
-      pUrbano.style.width = '0%';
-      kUrbanoPct.textContent = '—';
-      kUrbRur.textContent = '—';
-    }
+    <div class="col-12 col-lg-6">
+      <canvas id="chartPueblos" height="160"></canvas>
+      <div class="form-text">Si Chart.js está cargado en la página, verás aquí un gráfico de pastel.</div>
+    </div>
+  `;
 
-    
-    const e014   = data.pob_edad_014   ?? data.edad_0_14   ?? null;
-    const e1564  = data.pob_edad_1564  ?? data.edad_15_64  ?? null;
-    const e65mas = data.pob_edad_65    ?? data.edad_65_mas ?? null;
-
-    
-    const ctx1 = document.getElementById('chartSexo');
-    if(chartSexo) chartSexo.destroy();
-    chartSexo = new Chart(ctx1, {
-      type:'bar',
-      data:{ labels:['Hombres','Mujeres'], datasets:[{ data:[hombres,mujeres] }] },
-      options:{ plugins:{ legend:{display:false} }, scales:{ y:{ beginAtZero:true } } }
-    });
-
-    
-    const ctx2 = document.getElementById('chartEdad');
-    if(chartEdad) chartEdad.destroy();
-    chartEdad = new Chart(ctx2, {
-      type:'bar',
-      data:{ labels:['0–14','15–64','65+'], datasets:[{ data:[e014||0, e1564||0, e65mas||0] }] },
-      options:{ plugins:{ legend:{display:false} }, scales:{ y:{ beginAtZero:true } } }
-    });
-
-    
-    const pueblos = extractPueblos(data).sort((a,b)=> b.value - a.value);
-    const totalPueblos = pueblos.reduce((s,p)=>s+p.value, 0);
-
-    tbodyPueblos.innerHTML = pueblos.map(p=>{
-      const pct = totalPueblos ? (p.value/totalPueblos*100) : 0;
-      return `<tr>
-        <td>${p.name}</td>
-        <td class="text-end value">${fmt(p.value)}</td>
-        <td class="text-end">${pct.toFixed(2)}%</td>
-      </tr>`;
-    }).join('');
-
-    pueblosTotal.textContent = fmt(totalPueblos);
-    pueblosPctTotal.textContent = totalPueblos ? '100%' : '—';
-
-    const ctxP = document.getElementById('chartPueblos');
-    if(chartPueblos) chartPueblos.destroy();
-    chartPueblos = new Chart(ctxP, {
-      type:'pie',
-      data:{
-        labels: pueblos.map(p=>p.name),
-        datasets:[{ data: pueblos.map(p=>p.value) }]
-      },
-      options:{ plugins:{ legend:{ position:'bottom' } } }
-    });
-
-    
-    const entries = Object.entries(data);
-    entries.sort(([a],[b]) => a.localeCompare(b));
-    tbodyInd.innerHTML = entries.map(([k,v])=>{
-      const nice = labelize(k);
-      const val  = (typeof v === 'number') ? fmt(v) : (v ?? '—');
-      return `<tr><td class="key">${nice}</td><td class="text-end value">${val}</td></tr>`;
-    }).join('');
-    badgeTotalInd.textContent = `${entries.length} indicadores`;
-  }
+  datosCensoDiv.innerHTML = htmlContent;
 
   
-  fillSelect();
-  cargar();
-  sel.addEventListener('change', cargar);
-  btnRecargar.addEventListener('click', cargar);
+  if (window.Chart && document.getElementById('chartPueblos')) {
+    const ctx = document.getElementById('chartPueblos');
+    
+    if (pueblos.length > 0) {
+      new Chart(ctx, {
+        type: 'pie',
+        data: {
+          labels: pueblos.map(p=>p.name),
+          datasets: [{ data: pueblos.map(p=>p.value) }]
+        },
+        options: { plugins: { legend: { position: 'bottom' } } }
+      });
+    }
+  }
+}
+
+
+municipioSelector.addEventListener('change', (event) => {
+  const codigoSeleccionado = event.target.value;
+  obtenerDatosCenso(codigoSeleccionado);
+});
+
+
+document.addEventListener('DOMContentLoaded', () => {
+  cargarMunicipios();
+  const urlParams = new URLSearchParams(window.location.search);
+  const municipioURL = urlParams.get('municipio');
+  if (municipioURL) {
+    municipioSelector.value = municipioURL;
+    obtenerDatosCenso(municipioURL);
+  } else {
+    obtenerDatosCenso(municipioSelector.value);
+  }
+});
+
+
+const h1 = document.querySelector('header h1');
+const h2 = document.querySelector('header h2');
+const p = document.querySelector('header p');
+
+const infoOriginal = {
+  h1: "Censo Nacional de Población y Vivienda",
+  h2: "Departamento de El Progreso",
+  p: "Explora los datos del censo de 2018 por municipio."
+};
+
+const infoPersonal = {
+  h1: "Engelber Venceslav Cifuentes Moran",
+  h2: "Carné: 1890-22-15397",
+  p: ""
+};
+
+let mostrandoInfoOriginal = true;
+
+function alternarBanner() {
+  if (mostrandoInfoOriginal) {
+    h1.textContent = infoPersonal.h1;
+    h2.textContent = infoPersonal.h2;
+    p.textContent = infoPersonal.p;
+  } else {
+    h1.textContent = infoOriginal.h1;
+    h2.textContent = infoOriginal.h2;
+    p.textContent = infoOriginal.p;
+  }
+  mostrandoInfoOriginal = !mostrandoInfoOriginal;
+}
+
+setInterval(alternarBanner, 5000);
 </script>
+
 
 </body>
 </html>
