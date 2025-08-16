@@ -11,7 +11,7 @@
 ## Tecnologías
 - HTML5, CSS3, Bootstrap 5
 - JavaScript (fetch API)
-- Chart.js (gráficos simples)
+- Ajax
 
 
 ## Autor
