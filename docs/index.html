@@ -190,7 +190,7 @@
       const code = sel.value;
       setEstado('Cargando…', true);
       try{
-        const url = `https://censopoblacion.azurewebsites.net/API/indicadores/2/${code}`;
+        const url = `https://censopoblacion.azurewebsites.net/API/indicadores/2/999${code}`;
         const res = await fetch(url, {cache:'no-store'});
         if(!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
@@ -204,72 +204,102 @@
 
     function render(data){
       
-      const hombres = data.total_sexo_hombre ?? data.total_hombres ?? data.hombres ?? 0;
-      const mujeres = data.total_sexo_mujeres ?? data.total_mujeres ?? data.mujeres ?? 0;
-      const total = (Number(hombres)||0) + (Number(mujeres)||0);
+  const total   = Number(data.pob_total) || 0;
+  const hombres = Number(data.total_sexo_hombre) || 0;
+  const mujeres = Number(data.total_sexo_mujeres) || 0;
 
-      kTotal.textContent   = fmt(total);
-      kHombres.textContent = fmt(hombres);
-      kMujeres.textContent = fmt(mujeres);
+  kTotal.textContent   = fmt(total);
+  kHombres.textContent = fmt(hombres);
+  kMujeres.textContent = fmt(mujeres);
 
-      const ph = total ? (hombres/total*100) : 0;
-      const pm = total ? (mujeres/total*100) : 0;
-      pHombres.style.width = ph.toFixed(1)+'%';
-      pMujeres.style.width = pm.toFixed(1)+'%';
-      kHombresPct.textContent = `${ph.toFixed(1)}% del total`;
-      kMujeresPct.textContent = `${pm.toFixed(1)}% del total`;
+  const ph = Number(data.porc_sexo_hombre) || (total? (hombres/total*100):0);
+  const pm = Number(data.porc_sexo_mujeres) || (total? (mujeres/total*100):0);
+  pHombres.style.width = ph.toFixed(1)+'%';
+  pMujeres.style.width = pm.toFixed(1)+'%';
+  kHombresPct.textContent = `${ph.toFixed(1)}% del total`;
+  kMujeresPct.textContent = `${pm.toFixed(1)}% del total`;
 
-      const urbano = data.urbana ?? data.poblacion_urbana ?? data.total_urbana ?? null;
-      const rural  = data.rural  ?? data.poblacion_rural  ?? data.total_rural  ?? null;
-      if(urbano!=null && rural!=null){
-        const purb = (Number(urbano)/(Number(urbano)+Number(rural)))*100;
-        pUrbano.style.width = purb.toFixed(1)+'%';
-        kUrbanoPct.textContent = `${purb.toFixed(1)}% urbana`;
-        kUrbRur.textContent = `${fmt(urbano)} urbana / ${fmt(rural)} rural`;
-      }else{
-        pUrbano.style.width = '0%';
-        kUrbanoPct.textContent = '—';
-        kUrbRur.textContent = '—';
-      }
+ const urbano = Number(data.total_sector_urbano) || 0;
+  const rural  = Number(data.total_sector_rural) || 0;
+  const purb   = Number(data.porc_sector_urbano) || (urbano+ rural ? (urbano/(urbano+rural))*100 : 0);
+  pUrbano.style.width = purb.toFixed(1)+'%';
+  kUrbanoPct.textContent = `${purb.toFixed(1)}% urbana`;
+  kUrbRur.textContent = `${fmt(urbano)} urbana / ${fmt(rural)} rural`;
 
-    
-      const e014   = data.pob_edad_014   ?? data.edad_0_14   ?? null;
-      const e1564  = data.pob_edad_1564  ?? data.edad_15_64  ?? null;
-      const e65mas = data.pob_edad_65    ?? data.edad_65_mas ?? null;
+  const e014   = Number(data.pob_edad_014)  || 0;
+  const e1564  = Number(data.pob_edad_1564) || 0;
+  const e65mas = Number(data.pob_edad_65)   || 0;
 
-      
-      const ctx1 = document.getElementById('chartSexo');
-      if(chartSexo) chartSexo.destroy();
-      chartSexo = new Chart(ctx1, {
-        type:'bar',
-        data:{ labels:['Hombres','Mujeres'], datasets:[{ data:[hombres,mujeres] }] },
-        options:{ plugins:{ legend:{display:false} }, scales:{ y:{ beginAtZero:true } } }
-      });
+  if(chartSexo) chartSexo.destroy();
+  chartSexo = new Chart(document.getElementById('chartSexo'), {
+    type:'bar',
+    data:{ labels:['Hombres','Mujeres'], datasets:[{ data:[hombres, mujeres] }] },
+    options:{ plugins:{ legend:{display:false}}, scales:{ y:{ beginAtZero:true } } }
+  });
 
-      const ctx2 = document.getElementById('chartEdad');
-      if(chartEdad) chartEdad.destroy();
-      chartEdad = new Chart(ctx2, {
-        type:'bar',
-        data:{ labels:['0–14','15–64','65+'], datasets:[{ data:[e014||0, e1564||0, e65mas||0] }] },
-        options:{ plugins:{ legend:{display:false} }, scales:{ y:{ beginAtZero:true } } }
-      });
+  if(chartEdad) chartEdad.destroy();
+  chartEdad = new Chart(document.getElementById('chartEdad'), {
+    type:'bar',
+    data:{ labels:['0–14','15–64','65+'], datasets:[{ data:[e014, e1564, e65mas] }] },
+    options:{ plugins:{ legend:{display:false}}, scales:{ y:{ beginAtZero:true } } }
+  });
 
-      
-      const entries = Object.entries(data);
-      entries.sort(([a],[b]) => a.localeCompare(b));
-      tbodyInd.innerHTML = entries.map(([k,v])=>{
-        const nice = labelize(k);
-        const val  = (typeof v === 'number') ? fmt(v) : (v ?? '—');
-        return `<tr><td class="key">${nice}</td><td class="text-end value">${val}</td></tr>`;
-      }).join('');
-      badgeTotalInd.textContent = `${entries.length} indicadores`;
-    }
+  const LABELS = {
+    id:'ID',
+    depto_id:'Departamento ID',
+    municipio_id:'Municipio ID',
+    nombre:'Nombre',
+    tipo_lugar:'Tipo de lugar',
+    total_lugares:'Total de lugares',
+    capital:'Capital',
+    ext_territorial:'Extensión territorial (km²)',
+    pob_total:'Población total',
+    indice_masculinidad:'Índice de masculinidad',
+    prom_hijos_mujer:'Promedio de hijos por mujer',
+    edad_promedio:'Edad promedio',
+    indice_dependencia:'Índice de dependencia',
+    anios_prom_estudio:'Años promedio de estudio',
+    alfabetismo:'Alfabetismo (%)',
+    viviendas_part:'Viviendas particulares',
+    total_hogares:'Total de hogares',
+    prom_personas_hogar:'Prom. personas por hogar',
+    total_jefas_hogar:'% jefas de hogar',
+    total_sexo_hombre:'Total: hombres',
+    porc_sexo_hombre:'% hombres',
+    total_sexo_mujeres:'Total: mujeres',
+    porc_sexo_mujeres:'% mujeres',
+    total_sector_urbano:'Total urbano',
+    porc_sector_urbano:'% urbano',
+    total_sector_rural:'Total rural',
+    porc_sector_rural:'% rural',
+    pob_edad_014:'Población 0–14',
+    porc_edad_014:'% 0–14',
+    pob_edad_1564:'Población 15–64',
+    porc_edad_1564:'% 15–64',
+    pob_edad_65:'Población 65+',
+    porc_edad_65:'% 65+',
+    pob_pueblo_maya:'Pueblo Maya',
+    porc_pueblo_maya:'% Pueblo Maya',
+    pob_pueblo_garifuna:'Pueblo Garífuna',
+    porc_pueblo_garifuna:'% Pueblo Garífuna',
+    pob_pueblo_xinca:'Pueblo Xinca',
+    porc_pueblo_xinca:'% Pueblo Xinca',
+    pob_pueblo_afrodescendiente:'Pueblo Afrodescendiente',
+    porc_pueblo_afrodescendiente:'% Pueblo Afrodescendiente',
+    pob_pueblo_ladino:'Pueblo Ladino',
+    porc_pueblo_ladino:'% Pueblo Ladino',
+    pob_pueblo_extranjero:'Población extranjera',
+    porc_pueblo_extranjero:'% extranjera'
+  };
 
-    
-    fillSelect();
-    cargar();
-    sel.addEventListener('change', cargar);
-    btnRecargar.addEventListener('click', cargar);
-  </script>
+  const entries = Object.entries(data).sort(([a],[b]) => a.localeCompare(b));
+  tbodyInd.innerHTML = entries.map(([k,v])=>{
+    const nice = LABELS[k] || k.replaceAll('_',' ').replace(/\b([a-z])/g,c=>c.toUpperCase());
+    const val  = typeof v === 'number' ? fmt(v) : (v ?? '—');
+    return `<tr><td class="key">${nice}</td><td class="text-end value">${val}</td></tr>`;
+  }).join('');
+  badgeTotalInd.textContent = `${entries.length} indicadores`;
+}
+</script>
 </body>
 </html>
