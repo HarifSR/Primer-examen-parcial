@@ -109,3 +109,40 @@
         </div>
       </div>
     </section>
+
+<section class="mt-4">
+      <div class="card">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <h6 class="mb-0">Indicadores</h6>
+            <span class="badge rounded-pill badge-soft" id="badgeTotalInd">0 indicadores</span>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-sm align-middle">
+              <thead><tr><th>Indicador</th><th class="text-end">Valor</th></tr></thead>
+              <tbody id="tbodyInd"></tbody>
+            </table>
+          </div>
+          <div class="small text-secondary">Se listan todas las claves entregadas, con etiquetas.</div>
+        </div>
+      </div>
+    </section>
+
+<section class="mt-4 text-end footer">
+      <span id="fuente">Fuente: Censo (El Progreso) efectuado por la municipalidad – <code>:D</code></span>
+    </section>
+  </main>
+
+  <script>
+    
+    const AREAS = [
+      { code: 999, name: "Departamento El Progreso" },
+      { code: 201, name: "Guastatoya" },
+      { code: 202, name: "Morazán" },
+      { code: 203, name: "San Agustín Acasaguastlán" },
+      { code: 204, name: "San Cristóbal Acasaguastlán" },
+      { code: 205, name: "El Jícaro" },
+      { code: 206, name: "Sansare" },
+      { code: 207, name: "Sanarate" },
+      { code: 208, name: "San Antonio La Paz" }
+    ];
