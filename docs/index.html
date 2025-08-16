@@ -168,3 +168,108 @@
     
     let chartSexo, chartEdad;
 
+ const fmt = (n) => n===null||n===undefined||isNaN(n) ? '—' : Number(n).toLocaleString('es-GT');
+    const labelize = (k) => k
+        .replaceAll('_',' ')
+        .replace(/^pob edad/,'Población edad')
+        .replace(/^total sexo/,'Total sexo')
+        .replace(/\b(\d{2,})\b/g,'$1')
+        .replace(/\b([a-z])/g, c=>c.toUpperCase());
+
+    function setEstado(text, ok=true){
+      estado.textContent = text;
+      estado.className = 'badge rounded-pill ' + (ok ? 'badge-soft' : 'bg-danger');
+    }
+
+    function fillSelect(){
+      sel.innerHTML = AREAS.map(a=>`<option value="${a.code}">${a.code} — ${a.name}</option>`).join('');
+      sel.value = '999';
+    }
+
+    async function cargar(){
+      const code = sel.value;
+      setEstado('Cargando…', true);
+      try{
+        const url = `https://censopoblacion.azurewebsites.net/API/indicadores/2/${code}`;
+        const res = await fetch(url, {cache:'no-store'});
+        if(!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        render(data);
+        setEstado(`OK (${code})`);
+      }catch(err){
+        console.error(err);
+        setEstado('Error al cargar', false);
+      }
+    }
+
+    function render(data){
+      
+      const hombres = data.total_sexo_hombre ?? data.total_hombres ?? data.hombres ?? 0;
+      const mujeres = data.total_sexo_mujeres ?? data.total_mujeres ?? data.mujeres ?? 0;
+      const total = (Number(hombres)||0) + (Number(mujeres)||0);
+
+      kTotal.textContent   = fmt(total);
+      kHombres.textContent = fmt(hombres);
+      kMujeres.textContent = fmt(mujeres);
+
+      const ph = total ? (hombres/total*100) : 0;
+      const pm = total ? (mujeres/total*100) : 0;
+      pHombres.style.width = ph.toFixed(1)+'%';
+      pMujeres.style.width = pm.toFixed(1)+'%';
+      kHombresPct.textContent = `${ph.toFixed(1)}% del total`;
+      kMujeresPct.textContent = `${pm.toFixed(1)}% del total`;
+
+      const urbano = data.urbana ?? data.poblacion_urbana ?? data.total_urbana ?? null;
+      const rural  = data.rural  ?? data.poblacion_rural  ?? data.total_rural  ?? null;
+      if(urbano!=null && rural!=null){
+        const purb = (Number(urbano)/(Number(urbano)+Number(rural)))*100;
+        pUrbano.style.width = purb.toFixed(1)+'%';
+        kUrbanoPct.textContent = `${purb.toFixed(1)}% urbana`;
+        kUrbRur.textContent = `${fmt(urbano)} urbana / ${fmt(rural)} rural`;
+      }else{
+        pUrbano.style.width = '0%';
+        kUrbanoPct.textContent = '—';
+        kUrbRur.textContent = '—';
+      }
+
+    
+      const e014   = data.pob_edad_014   ?? data.edad_0_14   ?? null;
+      const e1564  = data.pob_edad_1564  ?? data.edad_15_64  ?? null;
+      const e65mas = data.pob_edad_65    ?? data.edad_65_mas ?? null;
+
+      
+      const ctx1 = document.getElementById('chartSexo');
+      if(chartSexo) chartSexo.destroy();
+      chartSexo = new Chart(ctx1, {
+        type:'bar',
+        data:{ labels:['Hombres','Mujeres'], datasets:[{ data:[hombres,mujeres] }] },
+        options:{ plugins:{ legend:{display:false} }, scales:{ y:{ beginAtZero:true } } }
+      });
+
+      const ctx2 = document.getElementById('chartEdad');
+      if(chartEdad) chartEdad.destroy();
+      chartEdad = new Chart(ctx2, {
+        type:'bar',
+        data:{ labels:['0–14','15–64','65+'], datasets:[{ data:[e014||0, e1564||0, e65mas||0] }] },
+        options:{ plugins:{ legend:{display:false} }, scales:{ y:{ beginAtZero:true } } }
+      });
+
+      
+      const entries = Object.entries(data);
+      entries.sort(([a],[b]) => a.localeCompare(b));
+      tbodyInd.innerHTML = entries.map(([k,v])=>{
+        const nice = labelize(k);
+        const val  = (typeof v === 'number') ? fmt(v) : (v ?? '—');
+        return `<tr><td class="key">${nice}</td><td class="text-end value">${val}</td></tr>`;
+      }).join('');
+      badgeTotalInd.textContent = `${entries.length} indicadores`;
+    }
+
+    
+    fillSelect();
+    cargar();
+    sel.addEventListener('change', cargar);
+    btnRecargar.addEventListener('click', cargar);
+  </script>
+</body>
+</html>
